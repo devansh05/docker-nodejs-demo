@@ -1,19 +1,27 @@
-FROM ubuntu
+FROM node:20-alpine as base
 
-RUN apt-get update
-RUN apt install -y curl
+# STAGE 1 Builder
+FROM base as builder
 
-RUN curl -sL https://deb.nodesource.com/setup_25.x -o /tmp/nodesource_setup.sh
-RUN bash /tmp/nodesource_setup.sh
-RUN apt install -y nodejs
+WORKDIR /home/node-demo
 
-COPY index.js /home/node-demo/index.js
-COPY package.json /home/node-demo/package.json
-
-WORKDIR /home/node-demo/
-
+COPY package.json .
+COPY tsconfig.json .
 RUN npm install
 
-EXPOSE 3000
+COPY src ./src
 
-CMD ["node", "index.js"]
+RUN npm run build
+
+# STAGE 2 Runner
+
+FROM base as runner
+
+WORKDIR /home/node-demo/dist
+
+COPY --from=builder /home/node-demo/dist dist/
+COPY --from=builder /home/node-demo/package*.json .
+
+RUN npm install --omit=dev
+
+CMD ["npm", "run", "dev"]
